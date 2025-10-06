@@ -234,81 +234,111 @@
       <button onclick="sendMessage()">Send</button>
     </div>
   </div>
+<script>
+  const userInput = document.getElementById("userInput");
+  const chatBox = document.getElementById("chatBox");
+  const chatContainer = document.querySelector(".chat-container");
+  const fileUpload = document.getElementById("fileUpload");
 
-  <script>
-    const userInput = document.getElementById("userInput");
-    const chatBox = document.getElementById("chatBox");
-    const chatContainer = document.querySelector(".chat-container");
+  let selectedFile = null; // store the chosen file
 
-    async function sendMessage() {
-      const message = userInput.value.trim();
-      if (message === "") return;
-      
-      if (!chatContainer.classList.contains("chat-active")) {
-        chatContainer.classList.add("chat-active");
-      }
+  // ✅ When user selects a file
+  fileUpload.addEventListener("change", (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      selectedFile = file;
+      userInput.value = file.name; // show file name in input bar
+    }
+  });
 
-      if (chatContainer.classList.contains("is-collapsed")) {
-        chatContainer.classList.remove("is-collapsed");
-      }
+  async function sendMessage() {
+    const message = userInput.value.trim();
 
-      appendMessage(message, "user");
-      userInput.value = "";
-      chatBox.scrollTop = chatBox.scrollHeight;
+    // prevent sending empty message unless a file is selected
+    if (message === "" && !selectedFile) return;
 
-      try {
-        const res = await fetch("https://umernaveed.app.n8n.cloud/webhook-test/Della", {
+    if (!chatContainer.classList.contains("chat-active")) {
+      chatContainer.classList.add("chat-active");
+    }
+
+    if (chatContainer.classList.contains("is-collapsed")) {
+      chatContainer.classList.remove("is-collapsed");
+    }
+
+    appendMessage(message || selectedFile.name, "user");
+    userInput.value = "";
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    try {
+      let res;
+
+      // ✅ If user uploaded a file → send as multipart/form-data
+      if (selectedFile) {
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        formData.append("text", message || "");
+
+        res = await fetch("https://umernaveed.app.n8n.cloud/webhook-test/Della", {
+          method: "POST",
+          body: formData
+        });
+
+        selectedFile = null; // reset after sending
+      } 
+      // ✅ Else send normal text JSON
+      else {
+        res = await fetch("https://umernaveed.app.n8n.cloud/webhook/Della", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question: message })
         });
-
-        if (!res.ok) {
-            throw new Error(`Server responded with status: ${res.status}`);
-        }
-
-        const data = await res.json();
-        const botReply = data.answer || "Sorry, I didn't get a response.";
-        appendMessage(botReply, "bot");
-
-      } catch (err)
- {
-        console.error("Error:", err);
-        appendMessage("Error: Could not connect to the AI assistant.", "bot");
       }
+
+      if (!res.ok) throw new Error(`Server responded with status: ${res.status}`);
+
+      const data = await res.json();
+      const botReply = data.answer || "Sorry, I didn't get a response.";
+      appendMessage(botReply, "bot");
+
+    } catch (err) {
+      console.error("Error:", err);
+      appendMessage("Error: Could not connect to the AI assistant.", "bot");
     }
+  }
 
-    function appendMessage(text, sender) {
-        const messageElement = document.createElement("div");
-        messageElement.className = `message ${sender}-message`;
-        messageElement.innerText = text;
-        chatBox.appendChild(messageElement);
-        chatBox.scrollTop = chatBox.scrollHeight;
+  function appendMessage(text, sender) {
+    const messageElement = document.createElement("div");
+    messageElement.className = `message ${sender}-message`;
+    messageElement.innerText = text;
+    chatBox.appendChild(messageElement);
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
+
+  userInput.addEventListener("keypress", function(event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      sendMessage();
     }
+  });
 
-    userInput.addEventListener("keypress", function(event) {
-        if (event.key === "Enter") {
-            event.preventDefault();
-            sendMessage();
-        }
-    });
+  userInput.addEventListener("focus", () => {
+    if (chatContainer.classList.contains("is-collapsed")) {
+      chatContainer.classList.remove("is-collapsed");
+    }
+  });
 
-    userInput.addEventListener("focus", () => {
-      if (chatContainer.classList.contains("is-collapsed")) {
-        chatContainer.classList.remove("is-collapsed");
-      }
-    });
+  document.addEventListener("click", (event) => {
+    const isChatActive = chatContainer.classList.contains("chat-active");
+    const isCollapsed = chatContainer.classList.contains("is-collapsed");
+    const isClickOutside = !chatContainer.contains(event.target);
 
-    document.addEventListener("click", (event) => {
-      const isChatActive = chatContainer.classList.contains("chat-active");
-      const isCollapsed = chatContainer.classList.contains("is-collapsed");
-      const isClickOutside = !chatContainer.contains(event.target);
+    if (isChatActive && !isCollapsed && isClickOutside) {
+      chatContainer.classList.add("is-collapsed");
+    }
+  });
+</script>
 
-      if (isChatActive && !isCollapsed && isClickOutside) {
-        chatContainer.classList.add("is-collapsed");
-      }
-    });
-  </script>
+  
 </body>
 </html>
 
